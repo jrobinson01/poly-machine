@@ -1,0 +1,146 @@
+<link rel="import" href="../../bower_components/polymer/polymer-element.html">
+<link rel="import" href="../../bower_components/polymer/lib/elements/dom-if.html">
+<link rel="import" href="../poly-machine/poly-machine.html">
+
+<dom-module id="poly-machine-app">
+  <template>
+      <style>
+        :host {
+          width: 200px;
+        }
+        #message {
+          width: 400px;
+          padding: 10px;
+          background-color: white;
+        }
+        :host([state = 'error']) #message {
+          background-color: red;
+          transition: all 2s;
+        }
+        :host([state = 'load-success']) #message {
+          background-color: cyan;
+          transition: all 2s;
+        }
+        button {
+          color: green;
+        }
+        button#invalidButton {
+          color: red;
+        }
+        button[disabled] {
+          color: gray;
+        }
+      </style>
+      <div>
+        <h3>How the what?</h3>
+        <p>
+          Click the buttons to change the state of the application. The possible flows are:
+          <ol>
+            <li>idle -> loading -> success</li>
+            <li>idle -> loading -> error</li>
+            <li>error -> loading -> idle</li>
+            <li>error -> idle</li>
+            <li>loading -> idle</li>
+          </ol>
+          Some transitions are impossible:
+          <ol>
+            <li>idle -> error</li>
+            <li>idle -> success</li>
+            <li>error -> success</li>
+            <li>succes -> error</li>
+          </ol>
+        </p>
+      </div>
+      <div id="message">
+        <template is="dom-if" if="[[isState(state, states.idle)]]">
+          idle state
+        </template>
+        <template is="dom-if" if="[[isState(state, states.loading)]]">
+          loading...
+        </template>
+        <template is="dom-if" if="[[isState(state, states.loadSuccess)]]">
+          success state
+        </template>
+        <template is="dom-if" if="[[isState(state, states.error)]]">
+          error state
+        </template>
+
+      </div>
+      <div id="multi-state">
+        <template is="dom-if" if="[[oneOfState(state, states.idle, states.loading)]]">
+          idle or loading
+        </template>
+      </div>
+      <div>
+        <button id="idleButton" on-click="toggleIdle" disabled="[[isState(state, states.idle)]]">Idle state</button> ->
+        <button id="loadingButton" on-click="toggleLoading" disabled="[[isState(state, states.loading)]]">Loading state</button> ->
+        <button id="successButton" on-click="toggleLoadSuccess" disabled="[[isState(state, states.loadSuccess)]]">Load success state</button>
+        <button id="errorButton" on-click="toggleError">Error state</button>
+      </div>
+    </template>
+
+  <script>
+    /**
+     * @customElement
+     * @polymer
+     */
+    class PolyMachineApp extends polyMachineMixin(Polymer.Element) {
+
+      static get is() { return 'poly-machine-app'; }
+
+      static get properties() {
+        return {
+          states:{
+            type: Object,
+            value: () => ({
+              idle: {
+                name: 'idle',
+                transitions: ['loading'],
+              },
+              loading: {
+                name: 'loading',
+                transitions: ['error', 'load-success', 'idle'],
+              },
+              loadSuccess: {
+                name: 'load-success',
+                transitions: ['loading', 'idle'],
+              },
+              error: {
+                name: 'error',
+                transitions: ['loading', 'idle']
+              },
+            })
+          },
+          initialState: {
+            type: String,
+            value: 'idle'
+          },
+        }
+      }
+
+      // react to state changes
+      onStateChange(newVal, oldVal) {
+        console.log('stateChange',newVal, oldVal);
+      }
+
+      toggleLoading(event) {
+        this.setState(this.states.loading);
+      }
+
+      toggleError(event) {
+        this.setState(this.states.error);
+      }
+
+      toggleIdle(event) {
+        this.setState(this.states.idle);
+      }
+
+      toggleLoadSuccess(event) {
+        this.setState(this.states.loadSuccess);
+      }
+
+    }
+
+    window.customElements.define(PolyMachineApp.is, PolyMachineApp);
+  </script>
+</dom-module>

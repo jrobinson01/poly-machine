@@ -1,0 +1,110 @@
+<script>
+
+function polyMachineMixin(Superclass) {
+
+  class PolyMachineMixin extends Superclass {
+
+    static get properties() {
+      return {
+        state: {
+          type: String,
+          reflectToAttribute: true,
+          notify: true,
+          readOnly: true
+        },
+        states: {
+          type: Object,
+          readOnly: true,
+          value: () => ({})
+        },
+        initialState: String
+      };
+    }
+
+    constructor() {
+      super();
+      this.state_;
+    }
+
+    connectedCallback() {
+      super.connectedCallback();
+      this.initializeState_(this.states);
+    }
+
+    initializeState_(states) {
+      const values = Object.values(states);
+      const initial = values.find(v => v.name === this.initialState);
+      if (initial) {
+        this.setState(initial);
+      } else {
+        throw new Error('initialState is not set');
+      }
+    }
+
+    isState(state, desired) {
+      return state === desired.name;
+    }
+
+    oneOfState(state, ...states) {
+      return states.findIndex(s => s.name === state) >= 0;
+    }
+
+    canEnterState(newState) {
+      const values = Object.values(this.states);
+      const names = values.map(v => v.name);
+      if (newState.name && names.includes(newState.name)) {
+        // so far, a valid state
+        if (!this.state_) {
+          // no current state, must be legit!
+          return true;
+        }
+        // is it a valid transition?
+        if (this.state_.transitions.includes(newState.name)) {
+          // is a valid transition from the current state
+          return true;
+        }
+      }
+      return false;
+    }
+
+    setState(newState) {
+      if (!newState) {
+        throw new Error(`attempted to enter illegal state: ${newState}`);
+      }
+      // prevent setting same state
+      if (newState === this.state_) {
+        return;
+      }
+      if (newState && this.canEnterState(newState)) {
+        // need to store this to call our "observer" function
+        const oldState = this.state_ ? Object.assign({}, this.state_) : undefined;
+        this.state_ = newState;
+        this._setState(newState.name);// state property is readonly, use special method to set
+        this.onStateChange(this.state_, oldState);
+        // also dispatch some events
+        if (oldState) {
+          this.dispatchEvent(new CustomEvent(`exit-${oldState.name}`, {
+            detail: {
+              oldState: oldState
+            }
+          }));
+        }
+        this.dispatchEvent(new CustomEvent(`enter-${this.state}`, {
+          detail: {
+            oldState: oldState
+          }
+        }));
+      } else {
+        throw new Error(`attempted an illegal transition: from '${this.state}' to '${newState.name}'`);
+      }
+    }
+
+    onStateChange(newState, oldState) {
+      // console.log('state changed', newState, oldState);
+    }
+
+  }
+  return PolyMachineMixin;
+}
+
+</script>

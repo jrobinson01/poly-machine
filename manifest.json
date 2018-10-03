@@ -1,0 +1,6 @@
+{
+  "name": "poly-machine",
+  "short_name": "poly-machine",
+  "start_url": "/",
+  "display": "standalone"
+}
