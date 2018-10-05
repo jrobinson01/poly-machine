@@ -1,5 +1,6 @@
-# \<poly-machine\>
+A Polymer 2 mixin that provides a state-machine/statechart like mechanism for components, heavily inspired by [xstate](https://davidkpiano.github.io/xstate/)
 
+[demo](https://jrobinson01.github.io/poly-machine-demo/)
 
 
 ## Install the Polymer-CLI
