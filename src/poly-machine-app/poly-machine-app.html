@@ -6,11 +6,11 @@
 <dom-module id="poly-machine-app">
   <template>
       <style>
-        :host {
-          font-family: Arial, Helvetica, sans-serif;
-        }
         :host([state='error']) {
           background-color: red;
+        }
+        div {
+          margin: 10px;
         }
       </style>
       <template is="dom-if" if="[[isState(state, states.idle)]]">
@@ -18,10 +18,12 @@
         (try "bob", or "steve")
       </template>
       <template is="dom-if" if="[[oneOfState(state, states.idle, states.results, states.emptyResults, states.error)]]">
-        <form on-submit="submitSearch">
-          <input type="text" value="{{searchTerm::input}}"></input>
-          <button type="submit" disabled="[[!searchTermIsValid(searchTerm)]]">Search</button>
-        </form>
+        <div>
+          <form on-submit="submitSearch">
+            <input type="text" value="{{searchTerm::input}}"></input>
+            <button type="submit" disabled="[[!searchTermIsValid(searchTerm)]]">Search</button>
+          </form>
+        </div>
       </template>
       <template is="dom-if" if="[[isState(state, states.loading)]]">
         searching...
@@ -33,13 +35,15 @@
         Sorry, no users found.
       </template>
       <template is="dom-if" if="[[isState(state, states.results)]]">
-        <ul>
-          <template is="dom-repeat" items="[[results]]">
-            <li on-click="clickSelectUser">
-              [[item.name]]
-            </li>
-          </template>
-        </ul>
+        <div>
+          <ul>
+            <template is="dom-repeat" items="[[results]]">
+              <li on-click="clickSelectUser">
+                [[item.name]]
+              </li>
+            </template>
+          </ul>
+        </div>
       </template>
       <template is="dom-if" if="[[isState(state, states.selected)]]">
         <button on-click="goBack">Back</button>
