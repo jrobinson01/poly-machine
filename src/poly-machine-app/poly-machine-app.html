@@ -6,6 +6,9 @@
 <dom-module id="poly-machine-app">
   <template>
       <style>
+        :host {
+          font-family: Arial, Helvetica, sans-serif;
+        }
         :host([state='error']) {
           background-color: red;
         }
@@ -58,10 +61,30 @@
       {name:'Bob', age:'44'},
     ];
 
+
+    const eventNames = {
+      LOADED_RESULTS: 'loaded-results',
+      NO_RESULTS: 'no-results',
+      ERROR: 'error',
+      SEARCH: 'search',
+      SELECT_PERSON: 'select-person',
+      DESELECT: 'deselect',
+    };
+
+    const stateNames = {
+      IDLE: 'idle',
+      LOADING: 'loading',
+      RESULTS: 'results',
+      EMPTY_RESULTS:'empty-results',
+      ERROR: 'error',
+      SELECTED: 'selected',
+    }
+
+
     // this event is duplicated amongst a few states
     const searchEvent = {
-      event: 'search',
-      target: 'loading',
+      event: eventNames.SEARCH,
+      target: stateNames.LOADING,
       cond: function() {
         return this.searchTermIsValid(this.searchTerm);
       }
@@ -81,41 +104,41 @@
             type: Object,
             value: () => ({
               idle: {
-                name: 'idle',
+                name: stateNames.IDLE,
                 events: [
                   searchEvent
                 ]
               },
               loading: {
-                name: 'loading',
+                name: stateNames.LOADING,
                 onEntry:  function() { this.doSearch() },
                 events: [
                   {
-                    event: 'loaded-results',
-                    target: 'results',
+                    event: eventNames.LOADED_RESULTS,
+                    target: stateNames.RESULTS,
                     cond:function() {
                       return this.results.length > 0;
                     }
                   },
                   {
-                    event: 'no-results',
-                    target: 'empty-results',
+                    event: eventNames.NO_RESULTS,
+                    target: stateNames.EMPTY_RESULTS,
                     cond:function() {
                       return this.results.length === 0;
                     }
                   },
                   {
-                    event:'error',
-                    target: 'error'
+                    event: eventNames.ERROR,
+                    target: stateNames.ERROR
                   }
                 ]
               },
               results: {
-                name: 'results',
+                name: stateNames.RESULTS,
                 events: [
                   {
-                    event:'select-person',
-                    target:'selected',
+                    event: eventNames.SELECT_PERSON,
+                    target: stateNames.SELECTED,
                     cond: function() {
                       return Boolean(this.selectedUser);
                     }
@@ -124,23 +147,23 @@
                 ]
               },
               emptyResults: {
-                name:'empty-results',
+                name: stateNames.EMPTY_RESULTS,
                 events: [
                   searchEvent
                 ]
               },
               error: {
-                name:'error',
+                name: stateNames.ERROR,
                 events: [
                   searchEvent
                 ]
               },
               selected: {
-                name: 'selected',
+                name: stateNames.SELECTED,
                 events: [
                   {
-                    event: 'deselect',
-                    target:'results'
+                    event: eventNames.DESELECT,
+                    target: stateNames.RESULTS
                   }
                 ]
               },
@@ -148,7 +171,7 @@
           },
           initialState: {
             type: String,
-            value: 'idle'
+            value: stateNames.IDLE
           },
           results: {
             type: Object
@@ -165,12 +188,12 @@
 
       submitSearch(event) {
         event.preventDefault();
-        this.send('search');
+        this.send(eventNames.SEARCH);
       }
 
       clickSelectUser(event) {
         this.selectedUser = event.model.item;
-        this.send('select-person');
+        this.send(eventNames.SELECT_PERSON);
       }
 
       searchTermIsValid(term) {
@@ -182,17 +205,17 @@
           this.results = dataSource.filter(u =>
             u.name.toLowerCase().includes(this.searchTerm.toLowerCase().trim()));
           if(this.searchTerm === 'steve') {
-            this.send('error');
+            this.send(eventNames.ERROR);
           } else if (this.results.length === 0) {
-            this.send('no-results');
+            this.send(eventNames.NO_RESULTS);
           } else {
-            this.send('loaded-results');
+            this.send(eventNames.LOADED_RESULTS);
           }
         }, 1000);
       }
 
       goBack(event) {
-        this.send('deselect');
+        this.send(eventNames.DESELECT);
       }
 
     }
