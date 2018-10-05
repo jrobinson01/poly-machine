@@ -120,16 +120,10 @@
                   {
                     event: eventNames.LOADED_RESULTS,
                     target: stateNames.RESULTS,
-                    cond:function() {
-                      return this.results.length > 0;
-                    }
                   },
                   {
                     event: eventNames.NO_RESULTS,
                     target: stateNames.EMPTY_RESULTS,
-                    cond:function() {
-                      return this.results.length === 0;
-                    }
                   },
                   {
                     event: eventNames.ERROR,
@@ -139,13 +133,13 @@
               },
               results: {
                 name: stateNames.RESULTS,
+                onEntry: function(event) {
+                  this.results = event.detail.results;
+                },
                 events: [
                   {
                     event: eventNames.SELECT_PERSON,
                     target: stateNames.SELECTED,
-                    cond: function() {
-                      return Boolean(this.selectedUser);
-                    }
                   },
                   searchEvent
                 ]
@@ -164,6 +158,10 @@
               },
               selected: {
                 name: stateNames.SELECTED,
+                onEntry: function(event) {
+                  console.log('onEnter selected', event.detail);
+                  this.selectedUser = event.detail.user;
+                },
                 events: [
                   {
                     event: eventNames.DESELECT,
@@ -196,8 +194,7 @@
       }
 
       clickSelectUser(event) {
-        this.selectedUser = event.model.item;
-        this.send(eventNames.SELECT_PERSON);
+        this.send(eventNames.SELECT_PERSON, {user: event.model.item});
       }
 
       searchTermIsValid(term) {
@@ -206,14 +203,14 @@
 
       doSearch() {
         setTimeout(() => {
-          this.results = dataSource.filter(u =>
+          const results = dataSource.filter(u =>
             u.name.toLowerCase().includes(this.searchTerm.toLowerCase().trim()));
           if(this.searchTerm === 'steve') {
             this.send(eventNames.ERROR);
-          } else if (this.results.length === 0) {
+          } else if (results.length === 0) {
             this.send(eventNames.NO_RESULTS);
           } else {
-            this.send(eventNames.LOADED_RESULTS);
+            this.send(eventNames.LOADED_RESULTS, {results});
           }
         }, 1000);
       }

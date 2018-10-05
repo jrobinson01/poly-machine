@@ -37,7 +37,7 @@
           // check conditions if exists
           if(!o.cond || o.cond.apply(this)) {
             // condition passes, setState
-            this.setState(this.getStateByName(o.target));
+            this.setState(this.getStateByName(o.target), event);
           }
         });
       })
@@ -66,7 +66,7 @@
       return Boolean(states && states.findIndex(s => s.name === state) >= 0);
     }
 
-    setState(newState) {
+    setState(newState, event) {
       if (!newState) {
         throw new Error(`no state provided!`);
       }
@@ -78,7 +78,7 @@
       this.state_ = newState;
       this.state = this._setState(newState.name);// state property is readonly, use special method to set
       if (newState.onEntry) {
-        newState.onEntry.apply(this);
+        newState.onEntry.call(this, event);
       }
     }
 
@@ -89,10 +89,13 @@
     /**
      * @description dispatches an event that our state machine consumes
      * @param {string} eventName
+     * @param {object} detail
      */
-    send(eventName) {
+    send(eventName, detail) {
       if (eventName) {
-        this.dispatchEvent(new CustomEvent(eventName));
+        this.dispatchEvent(new CustomEvent(eventName, {
+          detail: detail
+        }));
       }
     }
 
