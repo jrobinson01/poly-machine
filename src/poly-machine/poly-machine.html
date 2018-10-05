@@ -4,7 +4,7 @@
 
     static get properties() {
       return {
-        // TODO: 'state' should be settable via data binding
+        // TODO: should 'state' be settable via data binding?
         state: {
           type: String,
           reflectToAttribute: true,
@@ -55,7 +55,7 @@
       if (initial) {
         this.setState(initial);
       } else {
-        throw new Error('initialState is not set');
+        throw new Error(`'initialState' is not set`);
       }
     }
 
@@ -69,12 +69,13 @@
 
     setState(newState) {
       if (!newState) {
-        throw new Error(`attempted to enter illegal state: ${newState}`);
+        throw new Error(`no state provided!`);
       }
       // prevent setting same state
       if (newState === this.state_) {
         return;
       }
+      // TODO: call this.state_.onExit if exists
       this.state_ = newState;
       this.state = this._setState(newState.name);// state property is readonly, use special method to set
       if (newState.onEntry) {
