@@ -50,8 +50,7 @@
     }
 
     initializeState_(states) {
-      const values = Object.values(states);
-      const initial = values.find(v => v.name === this.initialState);
+      const initial = this.getStateByName(this.initialState);
       if (initial) {
         this.setState(initial);
       } else {
