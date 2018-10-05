@@ -1,11 +1,10 @@
 <script>
-
-function polyMachineMixin(Superclass) {
-
-  class PolyMachineMixin extends Superclass {
+  /** @polymerMixin */
+  const polyMachineMixin = (superclass) => class PolyMachineMixin extends superclass {
 
     static get properties() {
       return {
+        // TODO: 'state' should be settable via data binding
         state: {
           type: String,
           reflectToAttribute: true,
@@ -24,11 +23,30 @@ function polyMachineMixin(Superclass) {
     constructor() {
       super();
       this.state_;
+      this.initializeStateListeners_(this.states);
+      this.initializeState_(this.states);
     }
 
-    connectedCallback() {
-      super.connectedCallback();
-      this.initializeState_(this.states);
+    createStateListener_(state) {
+      state.events.forEach(o => {
+        this.addEventListener(o.event, event => {
+          // ignore event if we're not in the state that defines this listener
+          if(this.state !== state.name) {
+            return;
+          }
+          // check conditions if exists
+          if(!o.cond || o.cond.apply(this)) {
+            // condition passes, setState
+            this.setState(this.getStateByName(o.target));
+          }
+        });
+      })
+    }
+
+    initializeStateListeners_(states) {
+      for(let key in states) {
+        this.createStateListener_(states[key]);
+      }
     }
 
     initializeState_(states) {
@@ -46,25 +64,7 @@ function polyMachineMixin(Superclass) {
     }
 
     oneOfState(state, ...states) {
-      return states.findIndex(s => s.name === state) >= 0;
-    }
-
-    canEnterState(newState) {
-      const values = Object.values(this.states);
-      const names = values.map(v => v.name);
-      if (newState.name && names.includes(newState.name)) {
-        // so far, a valid state
-        if (!this.state_) {
-          // no current state, must be legit!
-          return true;
-        }
-        // is it a valid transition?
-        if (this.state_.transitions.includes(newState.name)) {
-          // is a valid transition from the current state
-          return true;
-        }
-      }
-      return false;
+      return Boolean(states && states.findIndex(s => s.name === state) >= 0);
     }
 
     setState(newState) {
@@ -75,36 +75,26 @@ function polyMachineMixin(Superclass) {
       if (newState === this.state_) {
         return;
       }
-      if (newState && this.canEnterState(newState)) {
-        // need to store this to call our "observer" function
-        const oldState = this.state_ ? Object.assign({}, this.state_) : undefined;
-        this.state_ = newState;
-        this._setState(newState.name);// state property is readonly, use special method to set
-        this.onStateChange(this.state_, oldState);
-        // also dispatch some events
-        if (oldState) {
-          this.dispatchEvent(new CustomEvent(`exit-${oldState.name}`, {
-            detail: {
-              oldState: oldState
-            }
-          }));
-        }
-        this.dispatchEvent(new CustomEvent(`enter-${this.state}`, {
-          detail: {
-            oldState: oldState
-          }
-        }));
-      } else {
-        throw new Error(`attempted an illegal transition: from '${this.state}' to '${newState.name}'`);
+      this.state_ = newState;
+      this.state = this._setState(newState.name);// state property is readonly, use special method to set
+      if (newState.onEntry) {
+        newState.onEntry.apply(this);
       }
     }
 
-    onStateChange(newState, oldState) {
-      // console.log('state changed', newState, oldState);
+    getStateByName(name) {
+      return Object.values(this.states).find(s => s.name === name);
+    }
+
+    /**
+     * @description dispatches an event that our state machine consumes
+     * @param {string} eventName
+     */
+    send(eventName) {
+      if (eventName) {
+        this.dispatchEvent(new CustomEvent(eventName));
+      }
     }
 
   }
-  return PolyMachineMixin;
-}
-
 </script>

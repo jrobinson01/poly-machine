@@ -1,85 +1,72 @@
 <link rel="import" href="../../bower_components/polymer/polymer-element.html">
 <link rel="import" href="../../bower_components/polymer/lib/elements/dom-if.html">
+<link rel="import" href="../../bower_components/polymer/lib/elements/dom-repeat.html">
 <link rel="import" href="../poly-machine/poly-machine.html">
 
 <dom-module id="poly-machine-app">
   <template>
       <style>
-        :host {
-          width: 200px;
-        }
-        #message {
-          width: 400px;
-          padding: 10px;
-          background-color: white;
-        }
-        :host([state = 'error']) #message {
+        :host([state='error']) {
           background-color: red;
-          transition: all 2s;
-        }
-        :host([state = 'load-success']) #message {
-          background-color: cyan;
-          transition: all 2s;
-        }
-        button {
-          color: green;
-        }
-        button#invalidButton {
-          color: red;
-        }
-        button[disabled] {
-          color: gray;
         }
       </style>
-      <div>
-        <h3>How the what?</h3>
-        <p>
-          Click the buttons to change the state of the application. The possible flows are:
-          <ol>
-            <li>idle -> loading -> success</li>
-            <li>idle -> loading -> error</li>
-            <li>error -> loading -> idle</li>
-            <li>error -> idle</li>
-            <li>loading -> idle</li>
-          </ol>
-          Some transitions are impossible:
-          <ol>
-            <li>idle -> error</li>
-            <li>idle -> success</li>
-            <li>error -> success</li>
-            <li>succes -> error</li>
-          </ol>
-        </p>
-      </div>
-      <div id="message">
-        <template is="dom-if" if="[[isState(state, states.idle)]]">
-          idle state
-        </template>
-        <template is="dom-if" if="[[isState(state, states.loading)]]">
-          loading...
-        </template>
-        <template is="dom-if" if="[[isState(state, states.loadSuccess)]]">
-          success state
-        </template>
-        <template is="dom-if" if="[[isState(state, states.error)]]">
-          error state
-        </template>
-
-      </div>
-      <div id="multi-state">
-        <template is="dom-if" if="[[oneOfState(state, states.idle, states.loading)]]">
-          idle or loading
-        </template>
-      </div>
-      <div>
-        <button id="idleButton" on-click="toggleIdle" disabled="[[isState(state, states.idle)]]">Idle state</button> ->
-        <button id="loadingButton" on-click="toggleLoading" disabled="[[isState(state, states.loading)]]">Loading state</button> ->
-        <button id="successButton" on-click="toggleLoadSuccess" disabled="[[isState(state, states.loadSuccess)]]">Load success state</button>
-        <button id="errorButton" on-click="toggleError">Error state</button>
-      </div>
+      <template is="dom-if" if="[[isState(state, states.idle)]]">
+        <h3>You can search for people!</h3>
+        (try "bob", or "steve")
+      </template>
+      <template is="dom-if" if="[[oneOfState(state, states.idle, states.results, states.emptyResults, states.error)]]">
+        <form on-submit="submitSearch">
+          <input type="text" value="{{searchTerm::input}}"></input>
+          <button type="submit" disabled="[[!searchTermIsValid(searchTerm)]]">Search</button>
+        </form>
+      </template>
+      <template is="dom-if" if="[[isState(state, states.loading)]]">
+        searching...
+      </template>
+      <template is="dom-if" if="[[isState(state, states.error)]]">
+        Barf. Something has gone horribly wrong.
+      </template>
+      <template is="dom-if" if="[[isState(state, states.emptyResults)]]">
+        Sorry, no users found.
+      </template>
+      <template is="dom-if" if="[[isState(state, states.results)]]">
+        <ul>
+          <template is="dom-repeat" items="[[results]]">
+            <li on-click="clickSelectUser">
+              [[item.name]]
+            </li>
+          </template>
+        </ul>
+      </template>
+      <template is="dom-if" if="[[isState(state, states.selected)]]">
+        <button on-click="goBack">Back</button>
+        <div>
+          name: [[selectedUser.name]] age: [[selectedUser.age]]
+        </div>
+      </template>
     </template>
 
   <script>
+
+    // fake database
+    const dataSource = [
+      {name:'Bobby', age:'25'},
+      {name:'Jimmy', age:'32'},
+      {name:'Fred', age:'12'},
+      {name:'June', age:'34'},
+      {name:'Angus', age:'89'},
+      {name:'Bob', age:'44'},
+    ];
+
+    // this event is duplicated amongst a few states
+    const searchEvent = {
+      event: 'search',
+      target: 'loading',
+      cond: function() {
+        return this.searchTermIsValid(this.searchTerm);
+      }
+    };
+
     /**
      * @customElement
      * @polymer
@@ -95,19 +82,67 @@
             value: () => ({
               idle: {
                 name: 'idle',
-                transitions: ['loading'],
+                events: [
+                  searchEvent
+                ]
               },
               loading: {
                 name: 'loading',
-                transitions: ['error', 'load-success', 'idle'],
+                onEntry:  function() { this.doSearch() },
+                events: [
+                  {
+                    event: 'loaded-results',
+                    target: 'results',
+                    cond:function() {
+                      return this.results.length > 0;
+                    }
+                  },
+                  {
+                    event: 'no-results',
+                    target: 'empty-results',
+                    cond:function() {
+                      return this.results.length === 0;
+                    }
+                  },
+                  {
+                    event:'error',
+                    target: 'error'
+                  }
+                ]
               },
-              loadSuccess: {
-                name: 'load-success',
-                transitions: ['loading', 'idle'],
+              results: {
+                name: 'results',
+                events: [
+                  {
+                    event:'select-person',
+                    target:'selected',
+                    cond: function() {
+                      return Boolean(this.selectedUser);
+                    }
+                  },
+                  searchEvent
+                ]
+              },
+              emptyResults: {
+                name:'empty-results',
+                events: [
+                  searchEvent
+                ]
               },
               error: {
-                name: 'error',
-                transitions: ['loading', 'idle']
+                name:'error',
+                events: [
+                  searchEvent
+                ]
+              },
+              selected: {
+                name: 'selected',
+                events: [
+                  {
+                    event: 'deselect',
+                    target:'results'
+                  }
+                ]
               },
             })
           },
@@ -115,28 +150,49 @@
             type: String,
             value: 'idle'
           },
+          results: {
+            type: Object
+          },
+          searchTerm: {
+            type: String,
+            value: ''// value required to trigger binding
+          },
+          selectedUser: {
+            type: Object
+          }
         }
       }
 
-      // react to state changes
-      onStateChange(newVal, oldVal) {
-        console.log('stateChange',newVal, oldVal);
+      submitSearch(event) {
+        event.preventDefault();
+        this.send('search');
       }
 
-      toggleLoading(event) {
-        this.setState(this.states.loading);
+      clickSelectUser(event) {
+        this.selectedUser = event.model.item;
+        this.send('select-person');
       }
 
-      toggleError(event) {
-        this.setState(this.states.error);
+      searchTermIsValid(term) {
+        return Boolean(term && term.trim().length >= 3);
       }
 
-      toggleIdle(event) {
-        this.setState(this.states.idle);
+      doSearch() {
+        setTimeout(() => {
+          this.results = dataSource.filter(u =>
+            u.name.toLowerCase().includes(this.searchTerm.toLowerCase().trim()));
+          if(this.searchTerm === 'steve') {
+            this.send('error');
+          } else if (this.results.length === 0) {
+            this.send('no-results');
+          } else {
+            this.send('loaded-results');
+          }
+        }, 1000);
       }
 
-      toggleLoadSuccess(event) {
-        this.setState(this.states.loadSuccess);
+      goBack(event) {
+        this.send('deselect');
       }
 
     }
