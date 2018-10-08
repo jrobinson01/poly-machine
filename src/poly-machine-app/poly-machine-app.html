@@ -13,9 +13,10 @@
           margin: 10px;
         }
       </style>
+
       <template is="dom-if" if="[[isState(state, states.idle)]]">
         <h3>You can search for people!</h3>
-        (try "bob", or "steve")
+        (hint: try "bob", or "steve")
       </template>
       <template is="dom-if" if="[[oneOfState(state, states.idle, states.results, states.emptyResults, states.error)]]">
         <div>
@@ -27,9 +28,10 @@
       </template>
       <template is="dom-if" if="[[isState(state, states.loading)]]">
         searching...
+        <button on-click="cancelSearch">Cancel</button>
       </template>
       <template is="dom-if" if="[[isState(state, states.error)]]">
-        Barf. Something has gone horribly wrong.
+        Barf. Something has gone horribly wrong. (or you searched for 'steve')
       </template>
       <template is="dom-if" if="[[isState(state, states.emptyResults)]]">
         Sorry, no users found.
@@ -65,7 +67,7 @@
       {name:'Bob', age:'44'},
     ];
 
-
+    //TODO: split into modules
     const eventNames = {
       LOADED_RESULTS: 'loaded-results',
       NO_RESULTS: 'no-results',
@@ -73,6 +75,7 @@
       SEARCH: 'search',
       SELECT_PERSON: 'select-person',
       DESELECT: 'deselect',
+      CANCEL: 'cancel',
     };
 
     const stateNames = {
@@ -89,9 +92,11 @@
     const searchEvent = {
       event: eventNames.SEARCH,
       target: stateNames.LOADING,
-      cond: function() {
-        return this.searchTermIsValid(this.searchTerm);
-      }
+      conditions: [
+        function() {
+          return this.searchTermIsValid(this.searchTerm);
+        }
+      ]
     };
 
     /**
@@ -104,19 +109,25 @@
 
       static get properties() {
         return {
-          states:{
+          state: {
+            reflectToAttribute: true,// override mixin if needed
+          },
+          states: {
             type: Object,
-            value: () => ({
+            value: () => ({// TODO: split into module
               idle: {
                 name: stateNames.IDLE,
-                events: [
+                onEntry: function() {
+                  clearTimeout(this.searchTimeout_);
+                },
+                transitions: [
                   searchEvent
                 ]
               },
               loading: {
                 name: stateNames.LOADING,
                 onEntry:  function() { this.doSearch() },
-                events: [
+                transitions: [
                   {
                     event: eventNames.LOADED_RESULTS,
                     target: stateNames.RESULTS,
@@ -128,15 +139,38 @@
                   {
                     event: eventNames.ERROR,
                     target: stateNames.ERROR
-                  }
+                  },
+                  {
+                    event: eventNames.CANCEL,
+                    target: stateNames.IDLE,
+                    conditions:[
+                      function() { return !this.results;}
+                    ]// no results, return to idle screen
+                  },
+                  {
+                    event: eventNames.CANCEL,
+                    target: stateNames.RESULTS,
+                    conditions:[
+                      function() { return this.results.length;}
+                    ]// return to previous results
+                  },
                 ]
               },
               results: {
                 name: stateNames.RESULTS,
-                onEntry: function(event) {
-                  this.results = event.detail.results;
+                onEntry: function(detail) {
+                  // TODO: this seems problematic? When entering
+                  // the "results" state from the "search" state,
+                  // the event contains the results array. When entering
+                  // from the "selected" state, the event does not
+                  // contain the results array, so we must check first.
+                  if (detail && detail.results) {
+                    this.results = detail.results;
+                  }
+                  // clear search timeout in case search was cancelled
+                  clearTimeout(this.searchTimeout_);
                 },
-                events: [
+                transitions: [
                   {
                     event: eventNames.SELECT_PERSON,
                     target: stateNames.SELECTED,
@@ -146,23 +180,25 @@
               },
               emptyResults: {
                 name: stateNames.EMPTY_RESULTS,
-                events: [
+                transitions: [
                   searchEvent
                 ]
               },
               error: {
                 name: stateNames.ERROR,
-                events: [
+                transitions: [
                   searchEvent
                 ]
               },
               selected: {
                 name: stateNames.SELECTED,
-                onEntry: function(event) {
-                  console.log('onEnter selected', event.detail);
-                  this.selectedUser = event.detail.user;
+                onEntry: function(detail) {
+                  this.selectedUser = detail.user;
                 },
-                events: [
+                onExit: function() {
+                  this.selectedUser = {};
+                },
+                transitions: [
                   {
                     event: eventNames.DESELECT,
                     target: stateNames.RESULTS
@@ -202,7 +238,9 @@
       }
 
       doSearch() {
-        setTimeout(() => {
+        // clear results
+        clearTimeout(this.searchTimeout_);
+        this.searchTimeout_ = setTimeout(() => {
           const results = dataSource.filter(u =>
             u.name.toLowerCase().includes(this.searchTerm.toLowerCase().trim()));
           if(this.searchTerm === 'steve') {
@@ -212,11 +250,16 @@
           } else {
             this.send(eventNames.LOADED_RESULTS, {results});
           }
-        }, 1000);
+        }, 2000);
       }
 
       goBack(event) {
-        this.send(eventNames.DESELECT);
+        // have to send results again?
+        this.send(eventNames.DESELECT, {results:this.results});
+      }
+
+      cancelSearch(event) {
+        this.send(eventNames.CANCEL);
       }
 
     }
