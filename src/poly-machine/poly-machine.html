@@ -105,10 +105,13 @@ let State;
       if (!this.state_) {
         throw new Error(`cannot send with no state: ${eventName}`);
       }
-      // find the transitions in the current state
+      // find the appropriate transitions in the current state
       const transitions = this.state_.transitions.filter(t => t.event === eventName);
-      // check each transitions for conditions.
-      // lets throw an error, for now, if any transition does not have conditions.
+      // no matching transitions in this state
+      if (transitions.length === 0) {
+        return;
+      }
+      // check each transition for conditions and throw an error, for now, if any transition does not have conditions.
       if (transitions.length > 1 && transitions.filter(t => !t.conditions).length > 0) {
         throw new Error(`multiple transitions found without conditions for event: ${eventName} in state: ${this.state}`);
       }
@@ -119,7 +122,7 @@ let State;
             return p ? p : p = c.call(this);
           }, false);
           if (passed) {
-            // blarg, this does not break the forEach loop!
+            // run the first passing transition
             this.transitionTo_(this.getStateByName(t.target), detail);
           }
           return passed;// break out of loop before testing more conditions
@@ -130,10 +133,9 @@ let State;
         // go for it if no conditions
         if (!transition.conditions) {
           return this.transitionTo_(this.getStateByName(transition.target), detail);
-        }
-        // if the transition does have conditions
-        if (transition && transition.conditions) {
-          // transitionTo_ when encountering a condition that returns true
+        } else {
+          // if the transition does have conditions,
+          // transitionTo_ on the first condition that returns true
           const passed = transition.conditions.reduce((p, c) => {
             return p ? p : p = c.call(this);
           }, false);
@@ -142,8 +144,6 @@ let State;
           }
         }
       }
-
     }
-
   }
 </script>
