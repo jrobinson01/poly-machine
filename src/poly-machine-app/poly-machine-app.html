@@ -1,269 +1,354 @@
 <link rel="import" href="../../bower_components/polymer/polymer-element.html">
 <link rel="import" href="../../bower_components/polymer/lib/elements/dom-if.html">
 <link rel="import" href="../../bower_components/polymer/lib/elements/dom-repeat.html">
-<link rel="import" href="../poly-machine/poly-machine.html">
+<!-- <link rel="import" href="../poly-machine/poly-machine.html"> -->
+<script src="../poly-machine/poly-machine.js"></script>
 
 <dom-module id="poly-machine-app">
   <template>
       <style>
-        :host([state='error']) {
-          background-color: red;
+        :host {
+          display: block;
+          height: 350px;
+          padding: 10px;
+          color: #444444;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
         }
-        div {
-          margin: 10px;
+        :host([state='error']) {
+          background-color: #bdc3c7;
+          color: #b71540;
+        }
+        h3 {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 400;
+        }
+        .hint {
+          color: #555;
+          font-size: 12px;
+        }
+        input {
+          border: 1px solid #eee;
+          background: #f5f8fc;
+          border-radius: 4px;
+          padding: 4px;
+          font: inherit;
+        }
+        button {
+          border: 1px solid #2176ae;
+          border-radius: 4px;
+          padding: 4px;
+          background: #2176ae;
+          color: white;
+          font: inherit;
+        }
+        button[disabled] {
+          border: 1px solid #CCC;
+          background: gray;
+        }
+        .cancel {
+          color: #e74c3c;
+          background: transparent;
+          border: none;
+          font-size: 12px;
+          text-transform: uppercase;
+          font-weight: 600;
+        }
+        .content {
+          margin-top: 16px;
+        }
+        ul {
+          list-style-type: none;
+          padding: 0;
+        }
+        li {
+          border-top: 1px solid #eee;
+          max-width: 300px;
+          padding: 8px 0;
+          cursor: pointer;
         }
       </style>
 
-      <template is="dom-if" if="[[isState(state, states.idle)]]">
+      <template is="dom-if" if="[[isState(currentState, states.idle)]]">
         <h3>You can search for people!</h3>
-        (hint: try "bob", or "steve")
+        <div class="hint">
+          (hint: try "bob", or "steve")
+        </div>
       </template>
-      <template is="dom-if" if="[[oneOfState(state, states.idle, states.results, states.emptyResults, states.error)]]">
+      <template is="dom-if" if="[[oneOfState(currentState, states.idle, states.loading, states.results, states.emptyResults, states.error)]]">
         <div>
           <form on-submit="submitSearch">
-            <input type="text" value="{{searchTerm::input}}"></input>
-            <button type="submit" disabled="[[!searchTermIsValid(searchTerm)]]">Search</button>
+            <input type="text" value="{{searchInputValue::input}}"></input>
+            <button type="submit" disabled="[[!searchTermIsValid(searchInputValue)]]">Search</button>
           </form>
         </div>
       </template>
-      <template is="dom-if" if="[[isState(state, states.loading)]]">
-        searching...
-        <button on-click="cancelSearch">Cancel</button>
-      </template>
-      <template is="dom-if" if="[[isState(state, states.error)]]">
-        Barf. Something has gone horribly wrong. (or you searched for 'steve')
-      </template>
-      <template is="dom-if" if="[[isState(state, states.emptyResults)]]">
-        Sorry, no users found.
-      </template>
-      <template is="dom-if" if="[[isState(state, states.results)]]">
-        <div>
-          <ul>
-            <template is="dom-repeat" items="[[results]]">
-              <li on-click="clickSelectUser">
-                [[item.name]]
-              </li>
-            </template>
-          </ul>
-        </div>
-      </template>
-      <template is="dom-if" if="[[isState(state, states.selected)]]">
+      <div class="content">
+        <template is="dom-if" if="[[isState(currentState, states.loading)]]">
+          searching for "[[currentTerm]]"...
+          <button class=cancel on-click="cancelSearch">Cancel</button>
+        </template>
+        <template is="dom-if" if="[[isState(currentState, states.error)]]">
+          Barf. Something has gone horribly wrong. (or you searched for 'steve')
+        </template>
+        <template is="dom-if" if="[[isState(currentState, states.emptyResults)]]">
+          Sorry, no users found.
+        </template>
+        <template is="dom-if" if="[[isState(currentState, states.results)]]">
+          <div>
+            Showing results for "[[lastSearchTerm]]"
+            <ul>
+              <template is="dom-repeat" items="[[results]]">
+                <li on-click="clickSelectUser">
+                  [[item.name]]
+                </li>
+              </template>
+            </ul>
+          </div>
+        </template>
+      </div>
+      <template is="dom-if" if="[[isState(currentState, states.selected)]]">
         <button on-click="goBack">Back</button>
         <div>
           name: [[selectedUser.name]] age: [[selectedUser.age]]
         </div>
       </template>
     </template>
+    <script>
+      // fake database
+        const dataSource = [
+          {name:'Bobby', age:'25'},
+          {name:'Jimmy', age:'32'},
+          {name:'Fred', age:'12'},
+          {name:'June', age:'34'},
+          {name:'Angus', age:'89'},
+          {name:'Bob', age:'44'},
+        ];
 
-  <script>
+        // TODO: split into modules
+        const eventNames = {
+          LOADED_RESULTS: 'loaded-results',
+          NO_RESULTS: 'no-results',
+          ERROR: 'error',
+          SEARCH: 'search',
+          SELECT_PERSON: 'select-person',
+          DESELECT: 'deselect',
+          CANCEL: 'cancel',
+          CLEAR_ERROR:'clear-error'
+        };
 
-    // fake database
-    const dataSource = [
-      {name:'Bobby', age:'25'},
-      {name:'Jimmy', age:'32'},
-      {name:'Fred', age:'12'},
-      {name:'June', age:'34'},
-      {name:'Angus', age:'89'},
-      {name:'Bob', age:'44'},
-    ];
-
-    //TODO: split into modules
-    const eventNames = {
-      LOADED_RESULTS: 'loaded-results',
-      NO_RESULTS: 'no-results',
-      ERROR: 'error',
-      SEARCH: 'search',
-      SELECT_PERSON: 'select-person',
-      DESELECT: 'deselect',
-      CANCEL: 'cancel',
-    };
-
-    const stateNames = {
-      IDLE: 'idle',
-      LOADING: 'loading',
-      RESULTS: 'results',
-      EMPTY_RESULTS:'empty-results',
-      ERROR: 'error',
-      SELECTED: 'selected',
-    }
-
-
-    // this event is duplicated amongst a few states
-    const searchEvent = {
-      event: eventNames.SEARCH,
-      target: stateNames.LOADING,
-      conditions: [
-        function() {
-          return this.searchTermIsValid(this.searchTerm);
+        const stateNames = {
+          IDLE: 'idle',
+          LOADING: 'loading',
+          RESULTS: 'results',
+          EMPTY_RESULTS:'empty-results',
+          ERROR: 'error',
+          SELECTED: 'selected',
         }
-      ]
-    };
 
-    /**
-     * @customElement
-     * @polymer
-     */
-    class PolyMachineApp extends polyMachineMixin(Polymer.Element) {
 
-      static get is() { return 'poly-machine-app'; }
-
-      static get properties() {
-        return {
-          state: {
-            reflectToAttribute: true,// override mixin if needed
+        // this event is duplicated amongst a few states
+        const searchEvent = {
+          event: eventNames.SEARCH,
+          target: stateNames.LOADING,
+          condition: function() {
+            return this.searchTermIsValid(this.searchInputValue);
           },
-          states: {
-            type: Object,
-            value: () => ({// TODO: split into module
-              idle: {
-                name: stateNames.IDLE,
-                onEntry: function() {
-                  clearTimeout(this.searchTimeout_);
-                },
-                transitions: [
-                  searchEvent
-                ]
-              },
-              loading: {
-                name: stateNames.LOADING,
-                onEntry:  function() { this.doSearch() },
-                transitions: [
-                  {
-                    event: eventNames.LOADED_RESULTS,
-                    target: stateNames.RESULTS,
-                  },
-                  {
-                    event: eventNames.NO_RESULTS,
-                    target: stateNames.EMPTY_RESULTS,
-                  },
-                  {
-                    event: eventNames.ERROR,
-                    target: stateNames.ERROR
-                  },
-                  {
-                    event: eventNames.CANCEL,
-                    target: stateNames.IDLE,
-                    conditions:[
-                      function() { return !this.results;}
-                    ]// no results, return to idle screen
-                  },
-                  {
-                    event: eventNames.CANCEL,
-                    target: stateNames.RESULTS,
-                    conditions:[
-                      function() { return this.results.length;}
-                    ]// return to previous results
-                  },
-                ]
-              },
-              results: {
-                name: stateNames.RESULTS,
-                onEntry: function(detail) {
-                  // TODO: this seems problematic? When entering
-                  // the "results" state from the "search" state,
-                  // the event contains the results array. When entering
-                  // from the "selected" state, the event does not
-                  // contain the results array, so we must check first.
-                  if (detail && detail.results) {
-                    this.results = detail.results;
-                  }
-                  // clear search timeout in case search was cancelled
-                  clearTimeout(this.searchTimeout_);
-                },
-                transitions: [
-                  {
-                    event: eventNames.SELECT_PERSON,
-                    target: stateNames.SELECTED,
-                  },
-                  searchEvent
-                ]
-              },
-              emptyResults: {
-                name: stateNames.EMPTY_RESULTS,
-                transitions: [
-                  searchEvent
-                ]
-              },
-              error: {
-                name: stateNames.ERROR,
-                transitions: [
-                  searchEvent
-                ]
-              },
-              selected: {
-                name: stateNames.SELECTED,
-                onEntry: function(detail) {
-                  this.selectedUser = detail.user;
-                },
-                onExit: function() {
-                  this.selectedUser = {};
-                },
-                transitions: [
-                  {
-                    event: eventNames.DESELECT,
-                    target: stateNames.RESULTS
-                  }
-                ]
-              },
-            })
+          action: function(detail) {
+            this.currentTerm = detail.currentTerm;
+            this.doSearch(this.currentTerm);
+          }
+        };
+
+        const states = {
+          idle: {
+            name: stateNames.IDLE,
+            transitions: [
+              searchEvent
+            ]
           },
-          initialState: {
-            type: String,
-            value: stateNames.IDLE
+          loading: {
+            name: stateNames.LOADING,
+            transitions: [
+              {
+                event: eventNames.SEARCH,
+                target: stateNames.LOADING,
+                condition: function(detail) {
+                  // only search again if term is different
+                  return detail.currentTerm !== this.currentTerm;
+                },
+                action: function(detail) {
+                  this.currentTerm = detail.currentTerm;
+                  this.doSearch(this.currentTerm);
+                },
+              },
+              {
+                event: eventNames.LOADED_RESULTS,
+                target: stateNames.RESULTS,
+                action: function(detail) {
+                  this.results = detail.results;
+                  this.lastSearchTerm = detail.term;
+                }
+              },
+              {
+                event: eventNames.NO_RESULTS,
+                target: stateNames.EMPTY_RESULTS,
+              },
+              {
+                event: eventNames.ERROR,
+                target: stateNames.ERROR
+              },
+              {
+                event: eventNames.CANCEL,
+                target: stateNames.IDLE,
+                condition: function() {
+                  // no results, return to idle screen
+                  return !this.results;
+                },
+              },
+              {
+                event: eventNames.CANCEL,
+                target: stateNames.RESULTS,
+                condition: function() {
+                  // results populated, return to previous results
+                  return this.results.length > 0;
+                }
+              },
+            ]
           },
           results: {
-            type: Object
+            name: stateNames.RESULTS,
+            transitions: [
+              {
+                event: eventNames.SELECT_PERSON,
+                target: stateNames.SELECTED,
+                action: function(detail) {
+                  this.selectedUser = detail.user;
+                }
+              },
+              searchEvent
+            ]
           },
-          searchTerm: {
-            type: String,
-            value: ''// value required to trigger binding
+          emptyResults: {
+            name: stateNames.EMPTY_RESULTS,
+            transitions: [
+              searchEvent
+            ]
           },
-          selectedUser: {
-            type: Object
+          error: {
+            name: stateNames.ERROR,
+            transitions: [
+              searchEvent,
+              {
+                event: eventNames.CLEAR_ERROR,
+                target: stateNames.IDLE
+              }
+            ]
+          },
+          selected: {
+            name: stateNames.SELECTED,
+            onExit: function() {
+              // clear selected user
+              this.selectedUser = {};
+            },
+            transitions: [
+              {
+                event: eventNames.DESELECT,
+                target: stateNames.RESULTS
+              }
+            ]
+          },
+        };
+
+        /**
+         * @customElement
+         * @polymer
+         */
+        class PolyMachineApp extends PolyMachine.PolyMachineMixin(Polymer.Element) {
+
+          static get is() { return 'poly-machine-app'; }
+
+          static get properties() {
+            return {
+              state: {
+                reflectToAttribute: true,// override mixin
+              },
+              states: {
+                type: Object,
+                value: states
+              },
+              initialState: {
+                type: String,
+                value: states.idle
+              },
+              results: {
+                type: Object
+              },
+              //
+              searchInputValue: {
+                type: String,
+                value: '',// value required to trigger binding
+                observer:'observeSearchInputValue'
+              },
+              currentTerm: {
+                type: String
+              },
+              lastSearchTerm: {
+                type: String
+              },
+              selectedUser: {
+                type: Object
+              }
+            }
           }
+
+          searchTermIsValid(term) {
+            return Boolean(term && term.trim().length >= 3);
+          }
+
+          submitSearch(event) {
+            event.preventDefault();
+            this.send(eventNames.SEARCH, {
+              currentTerm: this.searchInputValue
+            });
+          }
+
+          clickSelectUser(event) {
+            this.send(eventNames.SELECT_PERSON, {
+              user: event.model.item
+            });
+          }
+
+          doSearch(term) {
+            // clear any previous search timeout
+            clearTimeout(this.searchTimeout_);
+            this.searchTimeout_ = setTimeout(() => {
+              const results = dataSource.filter(u =>
+                u.name.toLowerCase().includes(term.toLowerCase().trim()));
+              if(term === 'steve') {
+                this.send(eventNames.ERROR);
+              } else if (results.length === 0) {
+                this.send(eventNames.NO_RESULTS);
+              } else {
+                this.send(eventNames.LOADED_RESULTS, {results, term});
+              }
+            }, 2000);
+          }
+
+          goBack(event) {
+            this.send(eventNames.DESELECT);
+          }
+
+          cancelSearch(event) {
+            this.send(eventNames.CANCEL);
+          }
+
+          observeSearchInputValue(event) {
+            // clear error state when typing a new search term
+            this.send(eventNames.CLEAR_ERROR);
+          }
+
         }
-      }
-
-      submitSearch(event) {
-        event.preventDefault();
-        this.send(eventNames.SEARCH);
-      }
-
-      clickSelectUser(event) {
-        this.send(eventNames.SELECT_PERSON, {user: event.model.item});
-      }
-
-      searchTermIsValid(term) {
-        return Boolean(term && term.trim().length >= 3);
-      }
-
-      doSearch() {
-        // clear results
-        clearTimeout(this.searchTimeout_);
-        this.searchTimeout_ = setTimeout(() => {
-          const results = dataSource.filter(u =>
-            u.name.toLowerCase().includes(this.searchTerm.toLowerCase().trim()));
-          if(this.searchTerm === 'steve') {
-            this.send(eventNames.ERROR);
-          } else if (results.length === 0) {
-            this.send(eventNames.NO_RESULTS);
-          } else {
-            this.send(eventNames.LOADED_RESULTS, {results});
-          }
-        }, 2000);
-      }
-
-      goBack(event) {
-        // have to send results again?
-        this.send(eventNames.DESELECT, {results:this.results});
-      }
-
-      cancelSearch(event) {
-        this.send(eventNames.CANCEL);
-      }
-
-    }
-
-    window.customElements.define(PolyMachineApp.is, PolyMachineApp);
-  </script>
-</dom-module>
+        window.customElements.define(PolyMachineApp.is, PolyMachineApp);
+    </script>
+  </dom-module>
