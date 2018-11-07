@@ -1,8 +1,7 @@
 <link rel="import" href="../../bower_components/polymer/polymer-element.html">
 <link rel="import" href="../../bower_components/polymer/lib/elements/dom-if.html">
 <link rel="import" href="../../bower_components/polymer/lib/elements/dom-repeat.html">
-<!-- <link rel="import" href="../poly-machine/poly-machine.html"> -->
-<script src="../poly-machine/poly-machine.js"></script>
+<link rel="import" href="../../bower_components/polymer-state-machine/polymer-state-machine.html">
 
 <dom-module id="poly-machine-app">
   <template>
@@ -264,7 +263,7 @@
          * @customElement
          * @polymer
          */
-        class PolyMachineApp extends PolyMachine.PolyMachineMixin(Polymer.Element) {
+        class PolyMachineApp extends stateMachineMixin(Polymer.Element) {
 
           static get is() { return 'poly-machine-app'; }
 
